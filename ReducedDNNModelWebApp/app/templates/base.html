@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reduced DNN Model Web Application</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'app/css/styles.css' %}">
+</head>
+<body>
+    <!-- App Bar -->
+    <header class="app-bar">
+        <div class="app-bar-left">
+            <button class="menu-button" id="menuButton" aria-label="Menu">
+                <span class="menu-icon"></span>
+                <span class="menu-icon"></span>
+                <span class="menu-icon"></span>
+            </button>
+            <h1 class="app-bar-title">Reduced DNN Model</h1>
+        </div>
+    </header>
+
+    <!-- Sidebar Menu -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <nav class="sidebar" id="sidebar">
+        <ul class="sidebar-menu">
+            <li><a href="{% url 'home' %}" class="active">Image Classification</a></li>
+            <li><a href="/api/model-status/" target="_blank">Model Status</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 DNN Image Classification</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Get elements
+        const menuButton = document.getElementById('menuButton');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+        // Toggle menu function
+        function toggleMenu() {
+            menuButton.classList.toggle('active');
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('open');
+        }
+
+        // Event listeners
+        menuButton.addEventListener('click', toggleMenu);
+        sidebarOverlay.addEventListener('click', toggleMenu);
+
+        // Close menu on escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && sidebar.classList.contains('open')) {
+                toggleMenu();
+            }
+        });
+
+        // Update active menu item based on current page
+        const currentPath = window.location.pathname;
+        const menuLinks = document.querySelectorAll('.sidebar-menu a');
+        
+        menuLinks.forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            } else if (link.classList.contains('active') && link.getAttribute('href') !== currentPath) {
+                link.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

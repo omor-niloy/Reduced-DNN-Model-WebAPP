@@ -1,0 +1,3 @@
+# Place your PyTorch model files here:
+# - heavy_model.pt (or .pth)
+# - light_model.pt (or .pth)

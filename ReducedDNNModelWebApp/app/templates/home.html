@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Image Classification</h2>
+    <p>Upload an image and select a model to classify it using our Deep Neural Network models.</p>
+</div>
+
+<!-- Responsive Layout Container -->
+<div class="classification-container">
+    <!-- Left Column: Form -->
+    <div class="classification-form-column">
+        <div class="card">
+            <form id="classificationForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <!-- Model Selection Dropdown -->
+                <div class="form-group">
+                    <label for="modelSelect">Select Model:</label>
+                    <select id="modelSelect" name="model" class="form-select" required>
+                        <option value="">-- Choose a model --</option>
+                        <option value="heavy">Heavy Model</option>
+                        <option value="light">Light Model</option>
+                    </select>
+                </div>
+
+                <!-- Image Upload -->
+                <div class="form-group">
+                    <label for="imageUpload">Upload Image:</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="imageUpload" name="image" accept="image/*" class="file-input" required>
+                        <label for="imageUpload" class="file-label">
+                            <span id="fileName">Choose an image file...</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Image Preview -->
+                <div class="form-group" id="imagePreviewContainer" style="display: none;">
+                    <label>Image Preview:</label>
+                    <div class="image-preview">
+                        <img id="imagePreview" src="" alt="Preview">
+                    </div>
+                </div>
+
+                <!-- Classify Button -->
+                <div class="form-group">
+                    <button type="submit" class="btn-primary btn-large">Classify</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Right Column: Results -->
+    <div class="classification-results-column">
+        <div class="card" id="resultsCard" style="display: none;">
+            <h2>Classification Results</h2>
+            <div id="resultsContent">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // File input handling
+    const imageUpload = document.getElementById('imageUpload');
+    const fileName = document.getElementById('fileName');
+    const imagePreview = document.getElementById('imagePreview');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+
+    imageUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            fileName.textContent = file.name;
+            
+            // Show image preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                imagePreviewContainer.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        } else {
+            fileName.textContent = 'Choose an image file...';
+            imagePreviewContainer.style.display = 'none';
+        }
+    });
+
+    // Form submission handling
+    const classificationForm = document.getElementById('classificationForm');
+    const resultsCard = document.getElementById('resultsCard');
+    const resultsContent = document.getElementById('resultsContent');
+
+    classificationForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const model = document.getElementById('modelSelect').value;
+        const image = imageUpload.files[0];
+
+        if (!model || !image) {
+            alert('Please select a model and upload an image.');
+            return;
+        }
+
+        // Show loading state
+        resultsContent.innerHTML = '<p>⏳ Processing... Please wait.</p>';
+        resultsCard.style.display = 'block';
+
+        // Get CSRF token from cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        // Send to backend API with CSRF token
+        fetch('/api/classify/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultsContent.innerHTML = `
+                    <div class="result-item">
+                        <strong>Model Used:</strong> ${data.model_used === 'heavy' ? 'Heavy' : 'Light'}
+                    </div>
+                    <div class="result-item">
+                        <strong>Image:</strong> ${data.filename}
+                    </div>
+                    <div class="result-item">
+                        <strong>Status:</strong> <span class="status-completed">✓ Classification Complete</span>
+                    </div>
+                    <div class="result-item">
+                        <strong>Prediction:</strong> ${data.prediction}
+                    </div>
+                    <div class="result-item">
+                        <strong>Confidence:</strong> ${data.confidence}%
+                    </div>
+                    <div class="result-item">
+                        <strong>Class ID:</strong> ${data.class_id}
+                    </div>
+                    <div class="result-item">
+                        <strong>Inference Time:</strong> ${data.inference_time} ms
+                    </div>
+                    <div class="result-item">
+                        <strong>Total Processing Time:</strong> ${data.total_time} ms
+                    </div>
+                `;
+            } else {
+                resultsContent.innerHTML = `
+                    <div class="result-item" style="border-left-color: #f44336;">
+                        <strong>Error:</strong> ${data.error}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            resultsContent.innerHTML = `
+                <div class="result-item" style="border-left-color: #f44336;">
+                    <strong>Error:</strong> ${error.message}
+                </div>
+            `;
+        });
+    });
+
+    // Optional: Clear form and results when page is reloaded
+    window.addEventListener('beforeunload', function() {
+        // Reset form and hide results on page reload
+        classificationForm.reset();
+        resultsCard.style.display = 'none';
+        imagePreviewContainer.style.display = 'none';
+        fileName.textContent = 'Choose an image file...';
+    });
+</script>
+{% endblock %}
