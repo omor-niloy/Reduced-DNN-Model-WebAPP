@@ -196,20 +196,8 @@ curl -X POST http://localhost:8000/api/classify/ \
 - Ensure file is a valid image
 - File content must match extension
 
-## 📄 License
-
-This project is open source and available under the MIT License.
-
 ## 👤 Author
 
 **Omor Niloy**
 - GitHub: [@omor-niloy](https://github.com/omor-niloy)
 
-## 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome!
-
----
-
-**Version:** 1.0  
-**Last Updated:** October 24, 2025
