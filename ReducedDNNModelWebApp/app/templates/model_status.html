@@ -31,28 +31,34 @@
                     </div>
                 </div>
                 <div class="status-badge" id="heavyStatus"></div>
-                <div class="model-stats">
-                    <div class="stat-item">
-                        <div class="stat-icon">📦</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Model Size</span>
-                            <span class="stat-value" id="heavySize">--</span>
-                        </div>
+                
+                <!-- Model Info -->
+                <div class="model-info">
+                    <div class="info-item">
+                        <span class="info-label">📦 Model Size:</span>
+                        <span class="info-value" id="heavySize">--</span>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">⚡</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Avg Inference Time</span>
-                            <span class="stat-value" id="heavyInferenceTime">--</span>
-                        </div>
+                    <div class="info-item">
+                        <span class="info-label">🎯 CIFAR-10 Test Accuracy:</span>
+                        <span class="info-value" id="heavyAccuracy">--</span>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">🎯</div>
-                        <div class="stat-content">
-                            <span class="stat-label">CIFAR-10 Test Accuracy</span>
-                            <span class="stat-value" id="heavyAccuracy">--</span>
-                        </div>
-                    </div>
+                </div>
+
+                <!-- Performance Table -->
+                <div class="performance-section">
+                    <h3>Performance Metrics</h3>
+                    <table class="performance-table" id="heavyPerformanceTable">
+                        <thead>
+                            <tr>
+                                <th>Batch Size</th>
+                                <th>Inference Time (ms)</th>
+                                <th>Throughput (samples/sec)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -66,28 +72,34 @@
                     </div>
                 </div>
                 <div class="status-badge" id="lightStatus"></div>
-                <div class="model-stats">
-                    <div class="stat-item">
-                        <div class="stat-icon">📦</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Model Size</span>
-                            <span class="stat-value" id="lightSize">--</span>
-                        </div>
+                
+                <!-- Model Info -->
+                <div class="model-info">
+                    <div class="info-item">
+                        <span class="info-label">📦 Model Size:</span>
+                        <span class="info-value" id="lightSize">--</span>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">⚡</div>
-                        <div class="stat-content">
-                            <span class="stat-label">Avg Inference Time</span>
-                            <span class="stat-value" id="lightInferenceTime">--</span>
-                        </div>
+                    <div class="info-item">
+                        <span class="info-label">🎯 CIFAR-10 Test Accuracy:</span>
+                        <span class="info-value" id="lightAccuracy">--</span>
                     </div>
-                    <div class="stat-item">
-                        <div class="stat-icon">🎯</div>
-                        <div class="stat-content">
-                            <span class="stat-label">CIFAR-10 Test Accuracy</span>
-                            <span class="stat-value" id="lightAccuracy">--</span>
-                        </div>
-                    </div>
+                </div>
+
+                <!-- Performance Table -->
+                <div class="performance-section">
+                    <h3>Performance Metrics</h3>
+                    <table class="performance-table" id="lightPerformanceTable">
+                        <thead>
+                            <tr>
+                                <th>Batch Size</th>
+                                <th>Inference Time (ms)</th>
+                                <th>Throughput (samples/sec)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -219,10 +231,89 @@
     .model-stats {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 15px;
+        margin-top: 20px;
     }
 
-    .stat-item {
+    .model-info {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 20px;
+        padding: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+    }
+
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .info-label {
+        color: rgba(255, 255, 255, 0.9);
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .info-value {
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .performance-section {
+        margin-top: 20px;
+    }
+
+    .performance-section h3 {
+        font-size: 1.2rem;
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: 600;
+    }
+
+    .performance-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .performance-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .performance-table th {
+        padding: 12px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .performance-table td {
+        padding: 12px;
+        text-align: center;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.95rem;
+    }
+
+    .performance-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .performance-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .batch-size-cell {
+        font-weight: 600;
+        color: #667eea;
+    }    .stat-item {
         display: flex;
         align-items: center;
         gap: 1rem;
@@ -307,8 +398,8 @@
         const statusBadge = document.getElementById(modelType + 'Status');
         const nameElement = document.getElementById(modelType + 'ModelName');
         const sizeElement = document.getElementById(modelType + 'Size');
-        const inferenceTimeElement = document.getElementById(modelType + 'InferenceTime');
         const accuracyElement = document.getElementById(modelType + 'Accuracy');
+        const performanceTable = document.getElementById(modelType + 'PerformanceTable');
 
         // Remove all status classes
         card.classList.remove('available', 'unavailable');
@@ -326,18 +417,29 @@
             // Update size
             sizeElement.textContent = modelInfo.size_mb + ' MB';
             
-            // Update inference time
-            if (modelInfo.avg_inference_time !== null) {
-                inferenceTimeElement.textContent = modelInfo.avg_inference_time + ' ms';
-            } else {
-                inferenceTimeElement.textContent = '--';
-            }
-            
             // Update CIFAR-10 accuracy
             if (modelInfo.cifar10_accuracy !== null) {
                 accuracyElement.textContent = modelInfo.cifar10_accuracy + '%';
             } else {
                 accuracyElement.textContent = '--';
+            }
+
+            // Populate performance table
+            const tbody = performanceTable.querySelector('tbody');
+            tbody.innerHTML = ''; // Clear existing rows
+            
+            if (modelInfo.batch_metrics && modelInfo.batch_metrics.length > 0) {
+                modelInfo.batch_metrics.forEach(metric => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="batch-size-cell">${metric.batch_size}</td>
+                        <td>${metric.inference_time} ms</td>
+                        <td>${metric.throughput} samples/sec</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3">No performance data available</td></tr>';
             }
         } else {
             // Model file not found
@@ -346,8 +448,10 @@
             statusBadge.textContent = '✗ Not Found';
             
             sizeElement.textContent = '--';
-            inferenceTimeElement.textContent = '--';
             accuracyElement.textContent = '--';
+            
+            const tbody = performanceTable.querySelector('tbody');
+            tbody.innerHTML = '<tr><td colspan="3">Model not available</td></tr>';
         }
     }
 

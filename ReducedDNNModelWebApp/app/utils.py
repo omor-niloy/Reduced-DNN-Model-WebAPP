@@ -10,25 +10,18 @@ class ModelManager:
         self.model_dir = Path(settings.BASE_DIR) / 'app' / 'dnn_models'
         # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device = torch.device('cpu')
-        self.inference_times = {'heavy': [], 'light': []}  # Track inference times
         
     def load_model(self, model_name):
-        if model_name in self.models:
-            return self.models[model_name]
+        # if model_name in self.models:
+        #     return self.models[model_name]
 
         model_file = f"{model_name}.pt"
         model_path = self.model_dir / model_file
         
         try:
-            # light_model = torch.jit.load("quantized89.pt")
-            # heavy_model = torch.jit.load("bt94.pt")
-            # Load the model
             model = torch.jit.load(model_path, map_location=self.device)
-            model.eval()  # Set to evaluation mode
-            
-            # Cache the model
+            model.eval()
             self.models[model_name] = model
-            
             return model
             
         except Exception as e:
@@ -63,22 +56,13 @@ class ModelManager:
             # Time inference only
             inference_start = time.time()
             
-            # Perform inference
             with torch.no_grad():
                 output = model(image_tensor)
                 if isinstance(output, tuple):
                     output = output[1]
             
             inference_time = time.time() - inference_start
-            
-            # Track inference time for statistics
-            self.inference_times[model_name].append(inference_time * 1000)  # Store in milliseconds
-            # Keep only last 100 measurements
-            if len(self.inference_times[model_name]) > 100:
-                self.inference_times[model_name].pop(0)
 
-            # Process output - MODIFY THIS based on your model
-            # Example for classification models:
             probabilities = torch.nn.functional.softmax(output, dim=1)
             confidence, predicted = torch.max(probabilities, 1)
             
@@ -116,15 +100,6 @@ class ModelManager:
         return ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
     
     def get_model_info(self, model_name):
-        """
-        Get information about a model
-        
-        Args:
-            model_name (str): 'heavy' or 'light'
-            
-        Returns:
-            dict: Model information
-        """
         model_file = f"{model_name}.pt"
         model_path = self.model_dir / model_file
         
@@ -135,24 +110,34 @@ class ModelManager:
         # Manually set values - Update these with your actual model performance
         model_specs = {
             'heavy': {
-                'avg_inference_time': 45.2,  # milliseconds - UPDATE THIS
-                'cifar10_accuracy': 94.5     # percentage - UPDATE THIS
+                'batch_metrics': [
+                    {'batch_size': 1, 'inference_time': 21.57, 'throughput': 46.4},
+                    {'batch_size': 8, 'inference_time': 26.11, 'throughput': 306.4},
+                    {'batch_size': 32, 'inference_time': 56.92, 'throughput': 562.1},
+                    {'batch_size': 64, 'inference_time': 106.90, 'throughput': 598.6}
+                ],
+                'cifar10_accuracy': 94.26    # percentage
             },
             'light': {
-                'avg_inference_time': 12.8,  # milliseconds - UPDATE THIS
-                'cifar10_accuracy': 89.3     # percentage - UPDATE THIS
+                'batch_metrics': [
+                    {'batch_size': 1, 'inference_time': 1.89, 'throughput': 528.0},
+                    {'batch_size': 8, 'inference_time': 3.25, 'throughput': 2461.5},
+                    {'batch_size': 32, 'inference_time': 7.78, 'throughput': 4112.1},
+                    {'batch_size': 64, 'inference_time': 14.42, 'throughput': 4438.0}
+                ],
+                'cifar10_accuracy': 89.40    # percentage
             }
         }
         
         if model_path.exists():
             file_size = os.path.getsize(model_path)
-            specs = model_specs.get(model_name, {'avg_inference_time': None, 'cifar10_accuracy': None})
+            specs = model_specs.get(model_name, {'batch_metrics': [], 'cifar10_accuracy': None})
             return {
                 'exists': True,
                 'loaded': model_name in self.models,
                 'name': model_name.capitalize(),
                 'size_mb': round(file_size / (1024 * 1024), 2),
-                'avg_inference_time': specs['avg_inference_time'],
+                'batch_metrics': specs['batch_metrics'],
                 'cifar10_accuracy': specs['cifar10_accuracy']
             }
         else:
@@ -161,7 +146,8 @@ class ModelManager:
                 'loaded': False,
                 'name': model_name.capitalize(),
                 'size_mb': None,
-                'avg_inference_time': None,
+                'inference_time': None,
+                'throughput': None,
                 'cifar10_accuracy': None,
                 'error': 'Model file not found'
             }
