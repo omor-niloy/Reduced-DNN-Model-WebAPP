@@ -25,7 +25,7 @@
     <nav class="sidebar" id="sidebar">
         <ul class="sidebar-menu">
             <li><a href="{% url 'home' %}" class="active">Image Classification</a></li>
-            <li><a href="/api/model-status/" target="_blank">Model Status</a></li>
+            <li><a href="{% url 'model_status_page' %}">Model Status</a></li>
         </ul>
     </nav>
 
@@ -34,11 +34,6 @@
         {% block content %}
         {% endblock %}
     </main>
-
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2025 DNN Image Classification</p>
-    </footer>
 
     <!-- JavaScript -->
     <script>

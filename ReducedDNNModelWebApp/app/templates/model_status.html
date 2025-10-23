@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block title %}Model Status - DNN Classifier{% endblock %}
+
+{% block content %}
+<div class="status-container">
+    <div class="status-header">
+        <h1>Model Status</h1>
+    </div>
+
+    <div id="loadingIndicator" class="loading-indicator">
+        <div class="spinner"></div>
+        <p>Loading model information...</p>
+    </div>
+
+    <div id="errorMessage" class="error-banner" style="display: none;">
+        <span class="error-icon">⚠</span>
+        <span id="errorText"></span>
+    </div>
+
+    <div id="statusContent" style="display: none;">
+        <!-- Models Grid -->
+        <div class="models-grid">
+            <!-- Heavy Model Card -->
+            <div class="model-card" id="heavyModelCard">
+                <div class="model-header">
+                    <div class="model-icon">🔥</div>
+                    <div>
+                        <h2 id="heavyModelName">Heavy Model</h2>
+                        <span class="model-label">High Accuracy</span>
+                    </div>
+                </div>
+                <div class="status-badge" id="heavyStatus"></div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Model Size</span>
+                            <span class="stat-value" id="heavySize">--</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Avg Inference Time</span>
+                            <span class="stat-value" id="heavyInferenceTime">--</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-content">
+                            <span class="stat-label">CIFAR-10 Test Accuracy</span>
+                            <span class="stat-value" id="heavyAccuracy">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Light Model Card -->
+            <div class="model-card" id="lightModelCard">
+                <div class="model-header">
+                    <div class="model-icon">⚡</div>
+                    <div>
+                        <h2 id="lightModelName">Light Model</h2>
+                        <span class="model-label">Fast Inference</span>
+                    </div>
+                </div>
+                <div class="status-badge" id="lightStatus"></div>
+                <div class="model-stats">
+                    <div class="stat-item">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Model Size</span>
+                            <span class="stat-value" id="lightSize">--</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Avg Inference Time</span>
+                            <span class="stat-value" id="lightInferenceTime">--</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-content">
+                            <span class="stat-label">CIFAR-10 Test Accuracy</span>
+                            <span class="stat-value" id="lightAccuracy">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .status-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .status-header h1 {
+        font-size: 2.5rem;
+        color: #1a1a1a;
+    }
+
+    .loading-indicator {
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        margin: 0 auto 1rem;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .error-banner {
+        background: #fee;
+        border-left: 4px solid #e53e3e;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .error-icon {
+        font-size: 1.5rem;
+    }
+
+    .models-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 2rem;
+    }
+
+    .model-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        border: 2px solid #f0f0f0;
+    }
+
+    .model-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .model-card.available {
+        border-color: #48bb78;
+    }
+
+    .model-card.unavailable {
+        border-color: #ed8936;
+    }
+
+    .model-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .model-icon {
+        font-size: 3rem;
+    }
+
+    .model-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+
+    .model-label {
+        display: block;
+        font-size: 0.85rem;
+        color: #666;
+        font-weight: normal;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .status-badge.available {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-badge.unavailable {
+        background: #feebc8;
+        color: #7c2d12;
+    }
+
+    .model-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f7fafc;
+        border-radius: 8px;
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+    }
+
+    .stat-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: #718096;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+        color: #2d3748;
+        font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+        .status-container {
+            padding: 1rem;
+        }
+
+        .status-header h1 {
+            font-size: 1.8rem;
+        }
+
+        .models-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .model-card {
+            padding: 1.5rem;
+        }
+    }
+</style>
+
+<script>
+    function fetchModelStatus() {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const statusContent = document.getElementById('statusContent');
+
+        loadingIndicator.style.display = 'block';
+        errorMessage.style.display = 'none';
+        statusContent.style.display = 'none';
+
+        fetch('/api/model-status/')
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.style.display = 'none';
+
+                if (data.success) {
+                    statusContent.style.display = 'block';
+                    updateModelCard('heavy', data.models.heavy);
+                    updateModelCard('light', data.models.light);
+                } else {
+                    showError(data.error || 'Failed to fetch model status');
+                }
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                showError('Network error: ' + error.message);
+            });
+    }
+
+    function updateModelCard(modelType, modelInfo) {
+        const card = document.getElementById(modelType + 'ModelCard');
+        const statusBadge = document.getElementById(modelType + 'Status');
+        const nameElement = document.getElementById(modelType + 'ModelName');
+        const sizeElement = document.getElementById(modelType + 'Size');
+        const inferenceTimeElement = document.getElementById(modelType + 'InferenceTime');
+        const accuracyElement = document.getElementById(modelType + 'Accuracy');
+
+        // Remove all status classes
+        card.classList.remove('available', 'unavailable');
+        statusBadge.classList.remove('available', 'unavailable');
+
+        // Update model name
+        nameElement.textContent = modelInfo.name + ' Model';
+
+        if (modelInfo.exists) {
+            // Model file exists
+            card.classList.add('available');
+            statusBadge.classList.add('available');
+            statusBadge.textContent = '✓ Available';
+            
+            // Update size
+            sizeElement.textContent = modelInfo.size_mb + ' MB';
+            
+            // Update inference time
+            if (modelInfo.avg_inference_time !== null) {
+                inferenceTimeElement.textContent = modelInfo.avg_inference_time + ' ms';
+            } else {
+                inferenceTimeElement.textContent = '--';
+            }
+            
+            // Update CIFAR-10 accuracy
+            if (modelInfo.cifar10_accuracy !== null) {
+                accuracyElement.textContent = modelInfo.cifar10_accuracy + '%';
+            } else {
+                accuracyElement.textContent = '--';
+            }
+        } else {
+            // Model file not found
+            card.classList.add('unavailable');
+            statusBadge.classList.add('unavailable');
+            statusBadge.textContent = '✗ Not Found';
+            
+            sizeElement.textContent = '--';
+            inferenceTimeElement.textContent = '--';
+            accuracyElement.textContent = '--';
+        }
+    }
+
+    function showError(message) {
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        errorText.textContent = message;
+        errorMessage.style.display = 'flex';
+    }
+
+    // Load status on page load
+    document.addEventListener('DOMContentLoaded', fetchModelStatus);
+</script>
+{% endblock %}

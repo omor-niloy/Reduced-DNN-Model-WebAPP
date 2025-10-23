@@ -10,6 +10,7 @@ class ModelManager:
         self.model_dir = Path(settings.BASE_DIR) / 'app' / 'dnn_models'
         # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device = torch.device('cpu')
+        self.inference_times = {'heavy': [], 'light': []}  # Track inference times
         
     def load_model(self, model_name):
         if model_name in self.models:
@@ -69,6 +70,12 @@ class ModelManager:
                     output = output[1]
             
             inference_time = time.time() - inference_start
+            
+            # Track inference time for statistics
+            self.inference_times[model_name].append(inference_time * 1000)  # Store in milliseconds
+            # Keep only last 100 measurements
+            if len(self.inference_times[model_name]) > 100:
+                self.inference_times[model_name].pop(0)
 
             # Process output - MODIFY THIS based on your model
             # Example for classification models:
@@ -125,18 +132,37 @@ class ModelManager:
             model_file = f"{model_name}.pth"
             model_path = self.model_dir / model_file
         
+        # Manually set values - Update these with your actual model performance
+        model_specs = {
+            'heavy': {
+                'avg_inference_time': 45.2,  # milliseconds - UPDATE THIS
+                'cifar10_accuracy': 94.5     # percentage - UPDATE THIS
+            },
+            'light': {
+                'avg_inference_time': 12.8,  # milliseconds - UPDATE THIS
+                'cifar10_accuracy': 89.3     # percentage - UPDATE THIS
+            }
+        }
+        
         if model_path.exists():
             file_size = os.path.getsize(model_path)
+            specs = model_specs.get(model_name, {'avg_inference_time': None, 'cifar10_accuracy': None})
             return {
                 'exists': True,
-                'path': str(model_path),
+                'loaded': model_name in self.models,
+                'name': model_name.capitalize(),
                 'size_mb': round(file_size / (1024 * 1024), 2),
-                'device': str(self.device)
+                'avg_inference_time': specs['avg_inference_time'],
+                'cifar10_accuracy': specs['cifar10_accuracy']
             }
         else:
             return {
                 'exists': False,
-                'path': str(model_path),
+                'loaded': False,
+                'name': model_name.capitalize(),
+                'size_mb': None,
+                'avg_inference_time': None,
+                'cifar10_accuracy': None,
                 'error': 'Model file not found'
             }
 

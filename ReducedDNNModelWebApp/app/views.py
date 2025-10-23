@@ -15,6 +15,12 @@ def Home(request):
     return render(request, 'home.html')
 
 
+@ensure_csrf_cookie
+def model_status_page(request):
+    """Render the model status page"""
+    return render(request, 'model_status.html')
+
+
 def classify_image(request):
     """
     API endpoint for image classification

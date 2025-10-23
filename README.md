@@ -181,7 +181,7 @@ curl -X POST http://localhost:8000/api/classify/ \
 ## 🚧 Troubleshooting
 
 **"Model file not found"**
-- Ensure models are in `app/ml_models/` with correct names
+- Ensure models are in `app/dnn_models/` with correct names
 - Check file extensions (`.pt` or `.pth`)
 
 **"CSRF token missing"**
