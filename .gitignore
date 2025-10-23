@@ -6,6 +6,13 @@ __pycache__/
 # C extensions
 *.so
 
+# Virtual Environment (custom name 'd')
+d/
+venv/
+env/
+ENV/
+.venv
+
 # Distribution / packaging
 .Python
 build/
@@ -60,6 +67,23 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+
+# Django media files (uploaded images)
+media/
+ReducedDNNModelWebApp/media/
+
+# Django static files
+staticfiles/
+ReducedDNNModelWebApp/staticfiles/
+
+# # Model files (too large for git)
+# *.pt
+# *.pth
+# *.onnx
+# *.h5
+# *.pb
+# app/dnn_models/*.pt
+# app/dnn_models/*.pth
 
 # Flask stuff:
 instance/
