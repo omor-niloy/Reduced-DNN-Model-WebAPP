@@ -11,27 +11,15 @@ from .utils import model_manager
 
 @ensure_csrf_cookie
 def Home(request):
-    """Render the home page with CSRF token"""
     return render(request, 'home.html')
 
 
 @ensure_csrf_cookie
 def model_status_page(request):
-    """Render the model status page"""
     return render(request, 'model_status.html')
 
 
 def classify_image(request):
-    """
-    API endpoint for image classification
-    
-    Expected POST data:
-        - image: Image file
-        - model: 'heavy' or 'light'
-    
-    Returns:
-        JSON response with classification results
-    """
     if request.method != 'POST':
         return JsonResponse({
             'success': False,
@@ -134,9 +122,8 @@ def classify_image(request):
         name_part = name_part[:50]  # Limit to 50 chars
         
         # Add timestamp and random string to prevent overwriting
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        random_str = uuid.uuid4().hex[:8]
-        unique_filename = f"{timestamp}_{random_str}_{name_part}{ext_part}"
+        timestamp = datetime.now().strftime('%d-%m-%Y')
+        unique_filename = f"{timestamp}_{name_part}{ext_part}"
         
         # Save the file
         fs = FileSystemStorage(location=upload_dir)
@@ -183,12 +170,6 @@ def classify_image(request):
 
 
 def get_model_status(request):
-    """
-    API endpoint to check if models are loaded and available
-    
-    Returns:
-        JSON response with model availability status
-    """
     try:
         heavy_info = model_manager.get_model_info('heavy')
         light_info = model_manager.get_model_info('light')
@@ -210,15 +191,6 @@ def get_model_status(request):
 
 
 def cleanup_old_uploads(max_age_seconds=3600):
-    """
-    Utility function to clean up old uploaded files
-    
-    Args:
-        max_age_seconds: Delete files older than this many seconds (default: 1 hour)
-    
-    This can be called periodically or manually to clean up any files
-    that weren't deleted during normal processing
-    """
     import time
     
     upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
