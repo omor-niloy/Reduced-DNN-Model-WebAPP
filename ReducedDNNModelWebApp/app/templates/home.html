@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="card">
-    <h2>Image Classification</h2>
-    <p>Upload an image and select a model to classify it using our Deep Neural Network models.</p>
+    <h2>Model Optimization</h2>
+    <p>Upload your PyTorch model architecture (.py file) and weights (.pth file), then select an optimization technique to reduce model size and improve inference speed.</p>
 </div>
 
 <!-- Responsive Layout Container -->
@@ -11,41 +11,131 @@
     <!-- Left Column: Form -->
     <div class="classification-form-column">
         <div class="card">
-            <form id="classificationForm" enctype="multipart/form-data">
+            <form id="modelProcessForm" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                <!-- Model Selection Dropdown -->
+                <!-- Optimization Technique Selection -->
                 <div class="form-group">
-                    <label for="modelSelect">Select Model:</label>
-                    <select id="modelSelect" name="model" class="form-select" required>
-                        <option value="">-- Choose a model --</option>
-                        <option value="heavy">Heavy Model</option>
-                        <option value="light">Light Model</option>
+                    <label for="techniqueSelect">Select Optimization Technique:</label>
+                    <select id="techniqueSelect" name="technique" class="form-select" required>
+                        <option value="">-- Choose a technique --</option>
+                        <option value="pruning">Pruning (Remove unnecessary weights)</option>
+                        <option value="quantization">Quantization (Reduce precision)</option>
+                        <option value="crd">CRD (Contrastive Representation Distillation)</option>
                     </select>
                 </div>
 
-                <!-- Image Upload -->
+                <!-- Model Architecture Upload -->
                 <div class="form-group">
-                    <label for="imageUpload">Upload Image:</label>
+                    <label for="architectureUpload">Upload Model Architecture (.py):</label>
                     <div class="file-upload-wrapper">
-                        <input type="file" id="imageUpload" name="image" accept="image/*" class="file-input" required>
-                        <label for="imageUpload" class="file-label">
-                            <span id="fileName">Choose an image file...</span>
+                        <input type="file" id="architectureUpload" name="architecture" accept=".py" class="file-input" required>
+                        <label for="architectureUpload" class="file-label">
+                            <span id="architectureFileName">Choose a .py file...</span>
                         </label>
                     </div>
-                </div>
-
-                <!-- Image Preview -->
-                <div class="form-group" id="imagePreviewContainer" style="display: none;">
-                    <label>Image Preview:</label>
-                    <div class="image-preview">
-                        <img id="imagePreview" src="" alt="Preview">
+                    <small style="color: #666; display: block; margin-top: 8px;">Python file containing model class definition</small>
+                    
+                    <!-- Architecture Upload Progress -->
+                    <div id="archUploadProgress" style="display: none; margin-top: 12px;">
+                        <div style="background: #e0e0e0; border-radius: 4px; height: 8px; overflow: hidden;">
+                            <div id="archUploadProgressBar" style="background: #2196F3; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="archUploadStatus" style="margin-top: 8px; font-size: 14px; color: #666;">Uploading...</p>
+                    </div>
+                    
+                    <!-- Architecture Upload Success -->
+                    <div id="archUploadSuccess" style="display: none; margin-top: 12px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+                        <span style="color: #1565c0;">✓ Architecture uploaded successfully!</span>
                     </div>
                 </div>
 
-                <!-- Classify Button -->
+                <!-- Model Class Name -->
                 <div class="form-group">
-                    <button type="submit" class="btn-primary btn-large">Classify</button>
+                    <label for="className">Model Class Name:</label>
+                    <input type="text" id="className" name="class_name" class="form-select" placeholder="e.g., WideResNet, ResNet, MyModel" required>
+                    <small style="color: #666; display: block; margin-top: 8px;">Name of the main model class in your .py file</small>
+                </div>
+
+                <!-- Model Init Parameters -->
+                <div class="form-group">
+                    <label for="initParams">Model Init Parameters (JSON):</label>
+                    <textarea id="initParams" name="init_params" class="form-select" rows="4" placeholder='{"in_channels": 3, "num_classes": 10, "dropout_rate": 0.3}'></textarea>
+                    <small style="color: #666; display: block; margin-top: 8px;">JSON format parameters to initialize the model. Leave empty if no parameters needed.</small>
+                </div>
+
+                <!-- Model Weights Upload -->
+                <div class="form-group">
+                    <label for="modelUpload">Upload Model Weights (.pth):</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="modelUpload" name="model" accept=".pth,.pt" class="file-input" required>
+                        <label for="modelUpload" class="file-label">
+                            <span id="fileName">Choose a .pth file (state_dict)...</span>
+                        </label>
+                    </div>
+                    <small style="color: #666; display: block; margin-top: 8px;">PyTorch state_dict file (.pth or .pt)</small>
+                    
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" style="display: none; margin-top: 12px;">
+                        <div style="background: #e0e0e0; border-radius: 4px; height: 8px; overflow: hidden;">
+                            <div id="uploadProgressBar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="uploadStatus" style="margin-top: 8px; font-size: 14px; color: #666;">Uploading...</p>
+                    </div>
+                    
+                    <!-- Upload Success Message -->
+                    <div id="uploadSuccess" style="display: none; margin-top: 12px; padding: 10px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 4px;">
+                        <span style="color: #2e7d32;">✓ Weights uploaded successfully!</span>
+                    </div>
+                </div>
+
+                <!-- Pruning Options (shown when pruning selected) -->
+<div class="form-group" id="pruningOptions" style="display: none;">
+                    <label for="pruningAmount">Pruning Amount (0-99):</label>
+                    <input type="number" id="pruningAmount" name="pruning_amount" min="0" max="99" value="50" class="form-input" placeholder="Enter value (0-99)">
+                    <small style="color: #666; display: block; margin-top: 8px;">Enter a value from 0 to 99. Higher values = more aggressive pruning</small>
+                </div>
+
+                <!-- Quantization Options (shown when quantization selected) -->
+                <div class="form-group" id="quantizationOptions" style="display: none;">
+                    <label for="quantizationType">Quantization Type:</label>
+                    <select id="quantizationType" name="quantization_type" class="form-select">
+                        <option value="dynamic">Dynamic Quantization</option>
+                        <option value="static">Static Quantization</option>
+                    </select>
+                    <small style="color: #666; display: block; margin-top: 8px;">Dynamic is faster to apply, static may yield better compression</small>
+                </div>
+
+                <!-- CRD Options (shown when CRD selected) -->
+                <div id="crdOptions" style="display: none;">
+                    <div class="form-group">
+                        <label for="studentClassName">Student Model Class Name:</label>
+                        <input type="text" id="studentClassName" name="student_class_name" class="form-select" placeholder="e.g., StudentResNet, SmallModel">
+                        <small style="color: #666; display: block; margin-top: 8px;">Name of the student model class in your .py file</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="studentInitParams">Student Model Init Parameters (JSON):</label>
+                        <textarea id="studentInitParams" name="student_init_params" class="form-select" rows="4" placeholder='{"in_channels": 3, "num_classes": 10}'></textarea>
+                        <small style="color: #666; display: block; margin-top: 8px;">JSON format parameters to initialize the student model</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="trainingScriptUpload">Training Script (.py):</label>
+                        <div class="file-upload-wrapper">
+                            <input type="file" id="trainingScriptUpload" name="training_script" accept=".py" class="file-input">
+                            <label for="trainingScriptUpload" class="file-label">
+                                <span id="trainingScriptFileName">Choose a .py file with dataset and training code...</span>
+                            </label>
+                        </div>
+                        <small style="color: #666; display: block; margin-top: 8px;">Python file containing dataset loader and training function</small>
+                    </div>
+                </div>
+
+                <!-- Process Button -->
+                <div class="form-group">
+                    <button type="submit" id="optimizeButton" class="btn-primary btn-large" disabled>Optimize Model</button>
+                    <small id="buttonHint" style="color: #999; display: block; margin-top: 8px;">Please upload both architecture (.py) and weights (.pth) files</small>
                 </div>
             </form>
         </div>
@@ -54,7 +144,7 @@
     <!-- Right Column: Results -->
     <div class="classification-results-column">
         <div class="card" id="resultsCard" style="display: none;">
-            <h2>Classification Results</h2>
+            <h2>Optimization Results</h2>
             <div id="resultsContent">
                 <!-- Results will be displayed here -->
             </div>
@@ -64,48 +154,199 @@
 
 <script>
     // File input handling
-    const imageUpload = document.getElementById('imageUpload');
+    const modelUpload = document.getElementById('modelUpload');
+    const architectureUpload = document.getElementById('architectureUpload');
     const fileName = document.getElementById('fileName');
-    const imagePreview = document.getElementById('imagePreview');
-    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const architectureFileName = document.getElementById('architectureFileName');
+    const techniqueSelect = document.getElementById('techniqueSelect');
+    const pruningOptions = document.getElementById('pruningOptions');
+    const quantizationOptions = document.getElementById('quantizationOptions');
+    const optimizeButton = document.getElementById('optimizeButton');
+    const buttonHint = document.getElementById('buttonHint');
+    
+    // Model weights upload elements
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const uploadSuccess = document.getElementById('uploadSuccess');
+    
+    // Architecture upload elements
+    const archUploadProgress = document.getElementById('archUploadProgress');
+    const archUploadProgressBar = document.getElementById('archUploadProgressBar');
+    const archUploadStatus = document.getElementById('archUploadStatus');
+    const archUploadSuccess = document.getElementById('archUploadSuccess');
+    
+    let uploadedModelFile = null;
+    let uploadedArchFile = null;
 
-    imageUpload.addEventListener('change', function(e) {
+    // Handle architecture file upload
+    architectureUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            architectureFileName.textContent = file.name;
+            uploadedArchFile = file;
+            
+            // Show upload progress
+            archUploadProgress.style.display = 'block';
+            archUploadSuccess.style.display = 'none';
+            archUploadProgressBar.style.width = '0%';
+            archUploadStatus.textContent = 'Reading architecture file...';
+            
+            // Simulate file reading progress
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                archUploadProgressBar.style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    archUploadStatus.textContent = 'Architecture loaded!';
+                    
+                    // Hide progress and show success
+                    setTimeout(() => {
+                        archUploadProgress.style.display = 'none';
+                        archUploadSuccess.style.display = 'block';
+                        checkBothFilesUploaded();
+                    }, 500);
+                }
+            }, 80);
+        } else {
+            architectureFileName.textContent = 'Choose a .py file...';
+            uploadedArchFile = null;
+            archUploadProgress.style.display = 'none';
+            archUploadSuccess.style.display = 'none';
+            checkBothFilesUploaded();
+        }
+    });
+
+    // Handle model weights file upload
+    modelUpload.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
             fileName.textContent = file.name;
+            uploadedModelFile = file;
             
-            // Show image preview
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.src = e.target.result;
-                imagePreviewContainer.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+            // Show upload progress
+            uploadProgress.style.display = 'block';
+            uploadSuccess.style.display = 'none';
+            uploadProgressBar.style.width = '0%';
+            uploadStatus.textContent = 'Reading weights file...';
+            
+            // Simulate file reading progress
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                uploadProgressBar.style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    uploadStatus.textContent = 'Weights loaded!';
+                    
+                    // Hide progress and show success
+                    setTimeout(() => {
+                        uploadProgress.style.display = 'none';
+                        uploadSuccess.style.display = 'block';
+                        checkBothFilesUploaded();
+                    }, 500);
+                }
+            }, 100);
         } else {
-            fileName.textContent = 'Choose an image file...';
-            imagePreviewContainer.style.display = 'none';
+            fileName.textContent = 'Choose a .pth file (state_dict)...';
+            uploadedModelFile = null;
+            uploadProgress.style.display = 'none';
+            uploadSuccess.style.display = 'none';
+            checkBothFilesUploaded();
+        }
+    });
+
+    // Check if both files are uploaded
+    function checkBothFilesUploaded() {
+        if (uploadedArchFile && uploadedModelFile) {
+            optimizeButton.disabled = false;
+            buttonHint.textContent = 'Ready to optimize';
+            buttonHint.style.color = '#4CAF50';
+        } else {
+            optimizeButton.disabled = true;
+            if (!uploadedArchFile && !uploadedModelFile) {
+                buttonHint.textContent = 'Please upload both architecture and weights files';
+            } else if (!uploadedArchFile) {
+                buttonHint.textContent = 'Please upload architecture file (.py)';
+            } else {
+                buttonHint.textContent = 'Please upload weights file (.pth)';
+            }
+            buttonHint.style.color = '#999';
+        }
+    }
+                    uploadStatus.textContent = 'File loaded successfully!';
+    
+    // Handle training script file upload
+    const trainingScriptUpload = document.getElementById('trainingScriptUpload');
+    const trainingScriptFileName = document.getElementById('trainingScriptFileName');
+    
+    trainingScriptUpload.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            trainingScriptFileName.textContent = this.files[0].name;
+        } else {
+            trainingScriptFileName.textContent = 'Choose a .py file with dataset and training code...';
+        }
+    });
+    
+    // Show/hide options based on technique selection
+    techniqueSelect.addEventListener('change', function() {
+        if (this.value === 'pruning') {
+            pruningOptions.style.display = 'block';
+            quantizationOptions.style.display = 'none';
+            crdOptions.style.display = 'none';
+        } else if (this.value === 'quantization') {
+            pruningOptions.style.display = 'none';
+            quantizationOptions.style.display = 'block';
+            crdOptions.style.display = 'none';
+        } else if (this.value === 'crd') {
+            pruningOptions.style.display = 'none';
+            quantizationOptions.style.display = 'none';
+            crdOptions.style.display = 'block';
+        } else {
+            pruningOptions.style.display = 'none';
+            quantizationOptions.style.display = 'none';
+            crdOptions.style.display = 'none';
         }
     });
 
     // Form submission handling
-    const classificationForm = document.getElementById('classificationForm');
+    const modelProcessForm = document.getElementById('modelProcessForm');
     const resultsCard = document.getElementById('resultsCard');
     const resultsContent = document.getElementById('resultsContent');
 
-    classificationForm.addEventListener('submit', function(e) {
+    modelProcessForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
         const formData = new FormData(this);
-        const model = document.getElementById('modelSelect').value;
-        const image = imageUpload.files[0];
+        const technique = techniqueSelect.value;
+        const model = modelUpload.files[0];
 
-        if (!model || !image) {
-            alert('Please select a model and upload an image.');
+        if (!technique || !model) {
+            alert('Please select an optimization technique and upload a model file.');
             return;
         }
 
+        // Get technique display name
+        let techniqueDisplay = '';
+        if (technique === 'pruning') {
+            techniqueDisplay = 'Pruning';
+        } else if (technique === 'quantization') {
+            techniqueDisplay = 'Quantization';
+        } else if (technique === 'crd') {
+            techniqueDisplay = 'CRD (Contrastive Representation Distillation)';
+        }
+
         // Show loading state
-        resultsContent.innerHTML = '<p>⏳ Processing... Please wait.</p>';
+        resultsContent.innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                <p>⏳ Processing your model... This may take a few minutes.</p>
+                <small style="color: #666;">Technique: ${techniqueDisplay}</small>
+            </div>
+        `;
         resultsCard.style.display = 'block';
 
         // Get CSRF token from cookie
@@ -127,7 +368,7 @@
         const csrftoken = getCookie('csrftoken');
 
         // Send to backend API with CSRF token
-        fetch('/api/classify/', {
+        fetch('/api/process-model/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': csrftoken
@@ -139,29 +380,39 @@
             if (data.success) {
                 resultsContent.innerHTML = `
                     <div class="result-item">
-                        <strong>Model Used:</strong> ${data.model_used === 'heavy' ? 'Heavy' : 'Light'}
+                        <strong>Status:</strong> <span class="status-completed">✓ Optimization Complete</span>
                     </div>
                     <div class="result-item">
-                        <strong>Image:</strong> ${data.filename}
+                        <strong>Technique:</strong> ${data.technique === 'pruning' ? 'Pruning' : data.technique === 'quantization' ? 'Quantization' : 'CRD (Contrastive Representation Distillation)'}
                     </div>
                     <div class="result-item">
-                        <strong>Status:</strong> <span class="status-completed">✓ Classification Complete</span>
+                        <strong>Original Size:</strong> ${data.original_size_mb} MB
                     </div>
                     <div class="result-item">
-                        <strong>Prediction:</strong> ${data.prediction}
+                        <strong>Optimized Size:</strong> ${data.optimized_size_mb} MB
                     </div>
                     <div class="result-item">
-                        <strong>Confidence:</strong> ${data.confidence}%
+                        <strong>Size Reduction:</strong> ${data.size_reduction_percent}%
                     </div>
                     <div class="result-item">
-                        <strong>Class ID:</strong> ${data.class_id}
+                        <strong>Processing Time:</strong> ${data.processing_time} seconds
                     </div>
-                    <div class="result-item">
-                        <strong>Inference Time:</strong> ${data.inference_time} ms
+                    <div class="result-item" style="margin-top: 20px;">
+                        <a href="/download/${data.download_filename}" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 12px 24px; margin-right: 10px;">
+                            📥 Download Optimized Model
+                        </a>
+                        ${data.technique === 'pruning' ? `
+                        <button onclick="viewArchitecture('${data.download_filename}')" class="btn-primary" style="padding: 12px 24px;">
+                            🔍 View Architecture
+                        </button>
+                        ` : ''}
                     </div>
-                    <div class="result-item">
-                        <strong>Total Processing Time:</strong> ${data.total_time} ms
+                    ${data.technique === 'pruning' ? `
+                    <div id="architectureView" style="display: none; margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 4px solid #2196F3;">
+                        <h3 style="margin-top: 0;">Model Architecture</h3>
+                        <pre id="architectureContent" style="background-color: #fff; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 12px;"></pre>
                     </div>
+                    ` : ''}
                 `;
             } else {
                 resultsContent.innerHTML = `
@@ -174,19 +425,34 @@
         .catch(error => {
             resultsContent.innerHTML = `
                 <div class="result-item" style="border-left-color: #f44336;">
-                    <strong>Error:</strong> ${error.message}
+                    <strong>Error:</strong> ${error.message || 'Failed to process model. Please try again.'}
                 </div>
             `;
         });
     });
 
-    // Optional: Clear form and results when page is reloaded
-    window.addEventListener('beforeunload', function() {
-        // Reset form and hide results on page reload
-        classificationForm.reset();
-        resultsCard.style.display = 'none';
-        imagePreviewContainer.style.display = 'none';
-        fileName.textContent = 'Choose an image file...';
-    });
+    // Function to view model architecture
+    function viewArchitecture(filename) {
+        const architectureView = document.getElementById('architectureView');
+        const architectureContent = document.getElementById('architectureContent');
+        
+        // Show loading state
+        architectureView.style.display = 'block';
+        architectureContent.textContent = 'Loading architecture summary...';
+        
+        // Fetch architecture summary
+        fetch(`/api/view-architecture/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                architectureContent.textContent = data.architecture;
+            } else {
+                architectureContent.textContent = 'Error: ' + data.error;
+            }
+        })
+        .catch(error => {
+            architectureContent.textContent = 'Error: Failed to load architecture summary.';
+        });
+    }
 </script>
 {% endblock %}

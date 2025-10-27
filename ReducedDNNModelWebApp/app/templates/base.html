@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reduced DNN Model Web Application</title>
+    <title>DNN Model Optimizer - Pruning & Quantization</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'app/css/styles.css' %}">
 </head>
@@ -16,7 +16,7 @@
                 <span class="menu-icon"></span>
                 <span class="menu-icon"></span>
             </button>
-            <h1 class="app-bar-title">Reduced DNN Model</h1>
+            <h1 class="app-bar-title">DNN Model Optimizer</h1>
         </div>
     </header>
 
@@ -24,8 +24,7 @@
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <nav class="sidebar" id="sidebar">
         <ul class="sidebar-menu">
-            <li><a href="{% url 'home' %}" class="active">Image Classification</a></li>
-            <li><a href="{% url 'model_status_page' %}">Model Status</a></li>
+            <li><a href="{% url 'home' %}" class="active">Model Optimizer</a></li>
         </ul>
     </nav>
 

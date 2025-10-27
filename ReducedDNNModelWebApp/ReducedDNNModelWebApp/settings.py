@@ -124,8 +124,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # File Upload Security Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB in bytes
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB in bytes
+# Increased limits for large model files (.pth files can be several GB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5368709120  # 5GB in bytes
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5368709120  # 5GB in bytes
 FILE_UPLOAD_PERMISSIONS = 0o644  # Read/write for owner, read for others
 
 # Default primary key field type

@@ -1,217 +1,388 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 import os
 from pathlib import Path
-from .utils import model_manager
+from datetime import datetime
+import re
+from .model_optimizer import model_optimizer
+from .cleanup import cleanup_media_directories
 
 # Create your views here.
 
 @ensure_csrf_cookie
 def Home(request):
+    # Clean up old files when user visits home page
+    print("=" * 60)
+    print("Home page accessed - Running cleanup...")
+    print("=" * 60)
+    try:
+        # Clean files immediately on page refresh (0 hours = delete all files)
+        deleted, size_freed = cleanup_media_directories(max_age_hours=0)  # 0 = immediate cleanup
+        size_mb = size_freed / (1024 * 1024)
+        print(f"Cleanup completed: {deleted} files deleted, {size_mb:.2f} MB freed")
+    except Exception as e:
+        print(f"Cleanup error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    print("=" * 60)
     return render(request, 'home.html')
 
 
-@ensure_csrf_cookie
-def model_status_page(request):
-    return render(request, 'model_status.html')
-
-
-def classify_image(request):
+def process_model(request):
+    """
+    Handle model upload, optimization (pruning/quantization), and return download link
+    """
     if request.method != 'POST':
         return JsonResponse({
             'success': False,
             'error': 'Only POST method is allowed'
         }, status=405)
     
-    # Validate model selection
-    model_name = request.POST.get('model', '').lower()
-    if model_name not in ['heavy', 'light']:
+    # Validate technique selection
+    technique = request.POST.get('technique', '').lower()
+    if technique not in ['pruning', 'quantization', 'crd']:
         return JsonResponse({
             'success': False,
-            'error': 'Invalid model selection. Choose "heavy" or "light"'
+            'error': 'Invalid technique. Choose "pruning", "quantization", or "crd"'
         }, status=400)
     
-    # Check if image was uploaded
-    if 'image' not in request.FILES:
+    # Check if both model and architecture files were uploaded
+    if 'model' not in request.FILES:
         return JsonResponse({
             'success': False,
-            'error': 'No image file uploaded'
+            'error': 'No model weights file uploaded'
         }, status=400)
     
-    image_file = request.FILES['image']
-    
-    # Security validation: File size limit (10MB)
-    max_file_size = 10 * 1024 * 1024  # 10MB in bytes
-    if image_file.size > max_file_size:
+    if 'architecture' not in request.FILES:
         return JsonResponse({
             'success': False,
-            'error': f'File too large. Maximum size is 10MB. Your file: {round(image_file.size / (1024 * 1024), 2)}MB'
+            'error': 'No architecture file uploaded'
         }, status=400)
     
-    # Validate file extension
-    allowed_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-    file_ext = os.path.splitext(image_file.name)[1].lower()
+    model_file = request.FILES['model']
+    architecture_file = request.FILES['architecture']
     
-    if file_ext not in allowed_extensions:
+    # Validate model file extension
+    allowed_model_extensions = ['.pth', '.pt']
+    model_ext = os.path.splitext(model_file.name)[1].lower()
+    
+    if model_ext not in allowed_model_extensions:
         return JsonResponse({
             'success': False,
-            'error': f'Invalid file type. Allowed types: {", ".join(allowed_extensions)}'
+            'error': f'Invalid model file type. Allowed types: {", ".join(allowed_model_extensions)}'
         }, status=400)
     
-    # Security: Validate file is actually an image by checking magic bytes
-    try:
-        from PIL import Image
-        import io
-        
-        # Read file content
-        image_data = image_file.read()
-        image_file.seek(0)  # Reset file pointer
-        
-        # Try to open as image - this validates it's a real image
-        img = Image.open(io.BytesIO(image_data))
-        img.verify()  # Verify it's not corrupted
-        
-        # Reset and re-open for actual use
-        image_file.seek(0)
-        img = Image.open(io.BytesIO(image_data))
-        
-        # Additional check: ensure image format matches extension
-        img_format = img.format.lower() if img.format else ''
-        expected_formats = {
-            '.jpg': ['jpeg'],
-            '.jpeg': ['jpeg'],
-            '.png': ['png'],
-            '.bmp': ['bmp'],
-            '.gif': ['gif']
-        }
-        
-        if img_format not in expected_formats.get(file_ext, []):
-            return JsonResponse({
-                'success': False,
-                'error': 'File extension does not match actual image format. Possible spoofing attempt.'
-            }, status=400)
-        
-        # Reset file pointer again for saving
-        image_file.seek(0)
-        
-    except Exception as e:
+    # Validate architecture file extension
+    arch_ext = os.path.splitext(architecture_file.name)[1].lower()
+    if arch_ext != '.py':
         return JsonResponse({
             'success': False,
-            'error': 'Invalid or corrupted image file. Please upload a valid image.'
+            'error': 'Invalid architecture file type. Must be a .py file'
         }, status=400)
     
     try:
-        # Save uploaded image with sanitized filename
-        upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
+        # Create directories for uploads and processed models
+        upload_dir = Path(settings.MEDIA_ROOT) / 'model_uploads'
+        processed_dir = Path(settings.MEDIA_ROOT) / 'processed_models'
+        arch_dir = Path(settings.MEDIA_ROOT) / 'architectures'
         upload_dir.mkdir(parents=True, exist_ok=True)
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        arch_dir.mkdir(parents=True, exist_ok=True)
         
-        # Security: Sanitize filename to prevent path traversal
-        import re
-        import uuid
-        from datetime import datetime
+        # Sanitize filenames
+        safe_model_filename = os.path.basename(model_file.name)
+        safe_model_filename = re.sub(r'[^\w\s.-]', '', safe_model_filename)
+        model_name_part, model_ext_part = os.path.splitext(safe_model_filename)
+        model_name_part = model_name_part[:50]
         
-        # Remove any directory path components
-        safe_filename = os.path.basename(image_file.name)
-        # Remove any non-alphanumeric characters except dots and dashes
-        safe_filename = re.sub(r'[^\w\s.-]', '', safe_filename)
-        # Limit filename length
-        name_part, ext_part = os.path.splitext(safe_filename)
-        name_part = name_part[:50]  # Limit to 50 chars
+        safe_arch_filename = os.path.basename(architecture_file.name)
+        safe_arch_filename = re.sub(r'[^\w\s.-]', '', safe_arch_filename)
+        arch_name_part, arch_ext_part = os.path.splitext(safe_arch_filename)
+        arch_name_part = arch_name_part[:50]
         
-        # Add timestamp and random string to prevent overwriting
-        timestamp = datetime.now().strftime('%d-%m-%Y')
-        unique_filename = f"{timestamp}_{name_part}{ext_part}"
+        # Add timestamp to prevent overwriting
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_model_filename = f"{timestamp}_{model_name_part}{model_ext_part}"
+        unique_arch_filename = f"{timestamp}_{arch_name_part}{arch_ext_part}"
         
-        # Save the file
-        fs = FileSystemStorage(location=upload_dir)
-        filename = fs.save(unique_filename, image_file)
-        image_path = upload_dir / filename
+        # Save uploaded model weights file
+        fs_model = FileSystemStorage(location=upload_dir)
+        model_filename = fs_model.save(unique_model_filename, model_file)
+        input_path = upload_dir / model_filename
         
-        # Security: Verify the saved file path is within upload directory
-        real_upload_dir = upload_dir.resolve()
-        real_image_path = image_path.resolve()
+        # Save uploaded architecture file
+        fs_arch = FileSystemStorage(location=arch_dir)
+        arch_filename = fs_arch.save(unique_arch_filename, architecture_file)
+        arch_path = arch_dir / arch_filename
         
-        if not str(real_image_path).startswith(str(real_upload_dir)):
-            # Path traversal attempt detected
-            if os.path.exists(image_path):
-                os.remove(image_path)
+        # Create output filename
+        technique_suffix = '_pruned' if technique == 'pruning' else '_quantized'
+        output_filename = f"{timestamp}_{model_name_part}{technique_suffix}{model_ext_part}"
+        output_path = processed_dir / output_filename
+        
+        # Get class name and init params from form
+        class_name = request.POST.get('class_name', '').strip()
+        init_params_json = request.POST.get('init_params', '').strip()
+        
+        if not class_name:
+            # Clean up uploaded files
+            if os.path.exists(input_path):
+                os.remove(input_path)
+            if os.path.exists(arch_path):
+                os.remove(arch_path)
             return JsonResponse({
                 'success': False,
-                'error': 'Invalid file path. Security violation detected.'
+                'error': 'Model class name is required'
             }, status=400)
         
-        # Classify the image
-        result = model_manager.classify_image(str(image_path), model_name)
+        # Parse init params JSON
+        init_params = {}
+        if init_params_json:
+            try:
+                import json
+                init_params = json.loads(init_params_json)
+                if not isinstance(init_params, dict):
+                    raise ValueError("Init params must be a JSON object")
+            except (json.JSONDecodeError, ValueError) as e:
+                # Clean up uploaded files
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(arch_path):
+                    os.remove(arch_path)
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Invalid JSON format for init params: {str(e)}'
+                }, status=400)
         
-        # Add filename to result
-        result['filename'] = filename
+        # Get optimization parameters
+        kwargs = {}
+        kwargs['architecture_path'] = str(arch_path)
+        kwargs['class_name'] = class_name
+        kwargs['init_params'] = init_params
         
-        # Clean up uploaded file after classification to save memory
+        if technique == 'pruning':
+            pruning_amount = int(request.POST.get('pruning_amount', 50))
+            # Validate pruning amount is between 0 and 99
+            if pruning_amount < 0 or pruning_amount > 99:
+                # Clean up uploaded files
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(arch_path):
+                    os.remove(arch_path)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Pruning amount must be between 0 and 99'
+                }, status=400)
+            kwargs['pruning_amount'] = pruning_amount
+        elif technique == 'quantization':
+            quantization_type = request.POST.get('quantization_type', 'dynamic')
+            kwargs['quantization_type'] = quantization_type
+        elif technique == 'crd':
+            # Get student model parameters
+            student_class_name = request.POST.get('student_class_name', '').strip()
+            student_init_params_json = request.POST.get('student_init_params', '').strip()
+            
+            if not student_class_name:
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(arch_path):
+                    os.remove(arch_path)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Student model class name is required for CRD'
+                }, status=400)
+            
+            # Parse student init params
+            student_init_params = {}
+            if student_init_params_json:
+                try:
+                    import json
+                    student_init_params = json.loads(student_init_params_json)
+                    if not isinstance(student_init_params, dict):
+                        raise ValueError("Student init params must be a JSON object")
+                except (json.JSONDecodeError, ValueError) as e:
+                    if os.path.exists(input_path):
+                        os.remove(input_path)
+                    if os.path.exists(arch_path):
+                        os.remove(arch_path)
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Invalid JSON format for student init params: {str(e)}'
+                    }, status=400)
+            
+            # Handle training script file
+            if 'training_script' not in request.FILES:
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(arch_path):
+                    os.remove(arch_path)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Training script file is required for CRD'
+                }, status=400)
+            
+            training_script_file = request.FILES['training_script']
+            
+            # Validate training script extension
+            training_ext = os.path.splitext(training_script_file.name)[1].lower()
+            if training_ext != '.py':
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(arch_path):
+                    os.remove(arch_path)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Training script must be a .py file'
+                }, status=400)
+            
+            # Save training script
+            training_dir = Path(settings.MEDIA_ROOT) / 'training_scripts'
+            training_dir.mkdir(parents=True, exist_ok=True)
+            
+            safe_training_filename = os.path.basename(training_script_file.name)
+            safe_training_filename = re.sub(r'[^\w\s.-]', '', safe_training_filename)
+            unique_training_filename = f"{timestamp}_{safe_training_filename}"
+            
+            fs_training = FileSystemStorage(location=training_dir)
+            training_filename = fs_training.save(unique_training_filename, training_script_file)
+            training_path = training_dir / training_filename
+            
+            kwargs['student_class_name'] = student_class_name
+            kwargs['student_init_params'] = student_init_params
+            kwargs['training_script_path'] = str(training_path)
+        
+        # Process the model
+        result = model_optimizer.optimize_model(
+            str(input_path),
+            str(output_path),
+            technique=technique,
+            **kwargs
+        )
+        
+        # Save a copy of the architecture file with the processed model
+        # This ensures we can view architecture later even after cleanup
+        if result['success']:
+            arch_copy_name = output_filename.replace('.pth', '_arch.py').replace('.pt', '_arch.py')
+            arch_copy_path = processed_dir / arch_copy_name
+            import shutil
+            shutil.copy2(str(arch_path), str(arch_copy_path))
+        
+        # Clean up uploaded files
         try:
-            if os.path.exists(image_path):
-                os.remove(image_path)
+            if os.path.exists(input_path):
+                os.remove(input_path)
+            if os.path.exists(arch_path):
+                os.remove(arch_path)
         except Exception as cleanup_error:
-            # Log the error but don't fail the request
-            print(f"Warning: Failed to delete uploaded file {image_path}: {cleanup_error}")
+            print(f"Warning: Failed to delete uploaded files: {cleanup_error}")
         
         if result['success']:
+            result['download_filename'] = output_filename
             return JsonResponse(result, status=200)
         else:
             return JsonResponse(result, status=500)
             
     except Exception as e:
+        # Clean up files on error
+        try:
+            if 'input_path' in locals() and os.path.exists(input_path):
+                os.remove(input_path)
+            if 'arch_path' in locals() and os.path.exists(arch_path):
+                os.remove(arch_path)
+        except:
+            pass
         return JsonResponse({
             'success': False,
             'error': f'Server error: {str(e)}'
         }, status=500)
 
 
-def get_model_status(request):
+def download_model(request, filename):
+    """
+    Handle model download
+    """
     try:
-        heavy_info = model_manager.get_model_info('heavy')
-        light_info = model_manager.get_model_info('light')
+        processed_dir = Path(settings.MEDIA_ROOT) / 'processed_models'
+        file_path = processed_dir / filename
         
-        return JsonResponse({
-            'success': True,
-            'models': {
-                'heavy': heavy_info,
-                'light': light_info
-            },
-            'device': str(model_manager.device)
-        })
+        # Security: Verify the file path is within processed directory
+        real_processed_dir = processed_dir.resolve()
+        real_file_path = file_path.resolve()
+        
+        if not str(real_file_path).startswith(str(real_processed_dir)):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid file path'
+            }, status=400)
+        
+        if not os.path.exists(file_path):
+            return JsonResponse({
+                'success': False,
+                'error': 'File not found'
+            }, status=404)
+        
+        # Return file as download
+        response = FileResponse(open(file_path, 'rb'), content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
         
     except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': str(e)
+            'error': f'Download error: {str(e)}'
         }, status=500)
 
 
-def cleanup_old_uploads(max_age_seconds=3600):
-    import time
-    
-    upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
-    if not upload_dir.exists():
-        return
-    
-    current_time = time.time()
-    deleted_count = 0
-    
+@require_http_methods(["GET"])
+def view_architecture(request, filename):
+    """View the architecture summary of a processed model"""
     try:
-        for file_path in upload_dir.glob('*'):
-            if file_path.is_file():
-                file_age = current_time - os.path.getmtime(file_path)
-                if file_age > max_age_seconds:
-                    try:
-                        os.remove(file_path)
-                        deleted_count += 1
-                    except Exception as e:
-                        print(f"Failed to delete {file_path}: {e}")
+        # Construct full file path
+        processed_dir = os.path.join(settings.MEDIA_ROOT, 'processed_models')
+        file_path = os.path.join(processed_dir, filename)
         
-        print(f"Cleaned up {deleted_count} old uploaded files")
+        # Security check
+        if not os.path.abspath(file_path).startswith(os.path.abspath(processed_dir)):
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid file path'
+            }, status=400)
+        
+        if not os.path.exists(file_path):
+            return JsonResponse({
+                'success': False,
+                'error': 'File not found'
+            }, status=404)
+        
+        # Find the corresponding architecture file
+        # The architecture file is saved as: modelname_arch.py
+        arch_filename = filename.replace('.pth', '_arch.py').replace('.pt', '_arch.py')
+        architecture_path = os.path.join(processed_dir, arch_filename)
+        
+        if not os.path.exists(architecture_path):
+            return JsonResponse({
+                'success': False,
+                'error': 'Architecture file not found. It may have been cleaned up.'
+            }, status=404)
+        
+        # Generate architecture summary
+        architecture_summary = model_optimizer.get_model_architecture(file_path, architecture_path)
+        
+        return JsonResponse({
+            'success': True,
+            'architecture': architecture_summary
+        })
         
     except Exception as e:
-        print(f"Error during cleanup: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to load architecture: {str(e)}'
+        }, status=500)
+
+
