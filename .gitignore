@@ -75,6 +75,8 @@ ReducedDNNModelWebApp/media/
 # Django static files
 staticfiles/
 ReducedDNNModelWebApp/staticfiles/
+cifar-10-python.tar.gz
+cifar-10-batches-py/
 
 # # Model files (too large for git)
 # *.pt
